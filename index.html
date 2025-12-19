@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Chat App</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen">
+            <div class="login-box">
+                <h1>💬 Welcome to Chat!</h1>
+                <p>Enter your name to start chatting</p>
+                <input type="text" id="username" placeholder="Your name" maxlength="20">
+                <button id="join-btn">Join Chat</button>
+                <p class="hint">Hint: Open another browser tab to chat with yourself!</p>
+            </div>
+        </div>
+
+        <!-- Chat Screen (hidden until login) -->
+        <div id="chat-screen" class="screen hidden">
+            <div class="sidebar">
+                <h2>👥 Online</h2>
+                <div id="online-count">0 users</div>
+                <div id="users-list"></div>
+            </div>
+            
+            <div class="main">
+                <div class="header">
+                    <h2>Group Chat</h2>
+                    <div id="typing-indicator"></div>
+                </div>
+                
+                <div class="messages" id="messages">
+                    <!-- Messages appear here -->
+                </div>
+                
+                <div class="input-area">
+                    <input type="text" id="message-input" placeholder="Type your message...">
+                    <button id="send-btn">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
