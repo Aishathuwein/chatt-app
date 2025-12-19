@@ -1,17 +1,18 @@
+// ========== 1. TOP OF FILE ==========
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const path = require('path');
+const path = require('path');  // ⭐ ADD THIS LINE
 
 // Create app
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Serve static files from public folder
+// ========== 2. MIDDLE SECTION ==========
+// ⭐ ADD THESE TWO LINES HERE:
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Handle all routes by serving index.html (for SPA)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -19,34 +20,19 @@ app.get('*', (req, res) => {
 // Store online users
 let onlineUsers = {};
 
-// Socket.io connection handling
+// ========== 3. SOCKET.IO CODE ==========
+// (Your existing socket.io code stays here - don't change it)
 io.on('connection', (socket) => {
     console.log('New connection:', socket.id);
 
-    // User joins
     socket.on('join-chat', (username) => {
         onlineUsers[socket.id] = username;
         socket.broadcast.emit('user-joined', username);
         io.emit('update-users', Object.values(onlineUsers));
     });
 
-    // User sends message
     socket.on('send-message', (message) => {
-        // Handle image messages
-socket.on('send-image', (imageData) => {
-    const username = onlineUsers[socket.id];
-    if (username) {
-        // Broadcast image to everyone except sender
-        socket.broadcast.emit('receive-image', {
-            user: username,
-            imageData: imageData.imageData,
-            filename: imageData.filename,
-            size: imageData.size,
-            time: new Date().toLocaleTimeString()
-        });
-        console.log(`${username} sent an image: ${imageData.filename}`);
-    }
-});const username = onlineUsers[socket.id];
+        const username = onlineUsers[socket.id];
         socket.broadcast.emit('receive-message', {
             user: username,
             text: message,
@@ -54,7 +40,6 @@ socket.on('send-image', (imageData) => {
         });
     });
 
-    // Typing indicators
     socket.on('typing', (username) => {
         socket.broadcast.emit('user-typing', username);
     });
@@ -63,7 +48,6 @@ socket.on('send-image', (imageData) => {
         socket.broadcast.emit('user-stop-typing');
     });
 
-    // User disconnects
     socket.on('disconnect', () => {
         const username = onlineUsers[socket.id];
         if (username) {
@@ -74,11 +58,11 @@ socket.on('send-image', (imageData) => {
     });
 });
 
-// Set port for Render
-const PORT = process.env.PORT || 3000;
+// ========== 4. BOTTOM OF FILE ==========
+// ⭐ CHANGE THESE LINES AT THE BOTTOM:
+const PORT = process.env.PORT || 3000;  // ⭐ USE THIS LINE
 
-// Start server
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {  // ⭐ ADD '0.0.0.0'
     console.log(`✅ Server running on port ${PORT}`);
-    console.log(`🌐 Ready for connections!`);
+    console.log(`🌐 Ready for global access!`);
 });

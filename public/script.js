@@ -535,7 +535,97 @@ function joinChat() {
         // ... rest of your existing code ...
     }
 }
+// ===== IMAGE SHARING =====
+const cameraBtn = document.getElementById('camera-btn');
+const galleryBtn = document.getElementById('gallery-btn');
+const imageInput = document.getElementById('image-input');
 
+// Open camera
+cameraBtn.addEventListener('click', () => {
+    imageInput.setAttribute('capture', 'environment');
+    imageInput.click();
+});
+
+// Open gallery
+galleryBtn.addEventListener('click', () => {
+    imageInput.removeAttribute('capture');
+    imageInput.click();
+});
+
+// Handle image selection
+imageInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Check if it's an image
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file (JPG, PNG, GIF)');
+        return;
+    }
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Image is too large! Maximum size is 5MB.');
+        return;
+    }
+    
+    // Preview and send
+    previewAndSendImage(file);
+});
+
+function previewAndSendImage(file) {
+    const reader = new FileReader();
+    
+    reader.onload = function(event) {
+        const imageData = event.target.result;
+        
+        // Create image message in chat
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message sent';
+        messageDiv.innerHTML = `
+            <div class="message-username">You</div>
+            <div class="image-container">
+                <img src="${imageData}" alt="Shared image">
+            </div>
+            <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} • Sending...</div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        scrollToBottom();
+        
+        // Send to server (simulated for now)
+        setTimeout(() => {
+            // In real app: socket.emit('send-image', imageData)
+            messageDiv.querySelector('.message-time').textContent = 
+                `${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} • Sent`;
+            
+            // Simulate others seeing it
+            setTimeout(() => {
+                addImageMessage(imageData, 'Alice', 'Nice picture!');
+            }, 1000);
+        }, 1500);
+    };
+    
+    reader.readAsDataURL(file);
+    imageInput.value = ''; // Reset input
+}
+
+// Function to display received images
+function addImageMessage(imageSrc, username, caption = '') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message received';
+    messageDiv.innerHTML = `
+        <div class="message-username">${username}</div>
+        <div class="image-container">
+            <img src="${imageSrc}" alt="${caption}">
+            ${caption ? `<div style="padding: 8px; background: rgba(0,0,0,0.7); color: white; font-size: 14px;">${caption}</div>` : ''}
+        </div>
+        <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    scrollToBottom();
+}
 // Modify sendMessage to add vibration
 function sendMessage() {
     const message = messageInput.value.trim();

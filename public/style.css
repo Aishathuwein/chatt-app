@@ -629,4 +629,44 @@ body {
     .user-item {
         background: #3A3A3C;
     }
+    /* Image message styling */
+.image-container {
+    max-width: 250px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 8px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.image-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 300px;
+    object-fit: cover;
+}
+
+/* Media buttons in input area */
+.media-btn {
+    background: #e9ecef;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 20px;
+    color: #495057;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.media-btn:hover {
+    background: #dee2e6;
+}
+
+.media-btn:active {
+    transform: scale(0.95);
+}
 }
