@@ -32,7 +32,21 @@ io.on('connection', (socket) => {
 
     // User sends message
     socket.on('send-message', (message) => {
-        const username = onlineUsers[socket.id];
+        // Handle image messages
+socket.on('send-image', (imageData) => {
+    const username = onlineUsers[socket.id];
+    if (username) {
+        // Broadcast image to everyone except sender
+        socket.broadcast.emit('receive-image', {
+            user: username,
+            imageData: imageData.imageData,
+            filename: imageData.filename,
+            size: imageData.size,
+            time: new Date().toLocaleTimeString()
+        });
+        console.log(`${username} sent an image: ${imageData.filename}`);
+    }
+});const username = onlineUsers[socket.id];
         socket.broadcast.emit('receive-message', {
             user: username,
             text: message,

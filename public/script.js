@@ -147,7 +147,146 @@ function sendMessage() {
 // ========== SOCKET.IO EVENT HANDLERS ==========
 socket.on('user-joined', (username) => {
     if (username !== myUsername) {
-        addSystemMessage(`🎉 ${username} joined the chat`);
+    // ========== IMAGE SHARING ==========
+const imageBtn = document.getElementById('image-btn');
+const cameraBtn = document.getElementById('camera-btn');
+const imageInput = document.getElementById('image-input');
+const cameraInput = document.getElementById('camera-input');
+
+// Image button click
+imageBtn.addEventListener('click', () => {
+    imageInput.click();
+});
+
+// Camera button click
+cameraBtn.addEventListener('click', () => {
+    cameraInput.click();
+});
+
+// Handle image selection
+imageInput.addEventListener('change', handleImageSelect);
+cameraInput.addEventListener('change', handleImageSelect);
+
+async function handleImageSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Image too large! Max 5MB.');
+        return;
+    }
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+    }
+    
+    // Vibration feedback
+    vibrate('send');
+    
+    // Create preview message immediately
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const imageUrl = e.target.result;
+        addImageMessage(imageUrl, 'Uploading...', 'You');
+        
+        // In a real app, you'd upload to a server here
+        // For demo, we'll simulate upload and send base64
+        simulateImageUpload(file, imageUrl);
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset input
+    event.target.value = '';
+}
+
+function simulateImageUpload(file, imageUrl) {
+    // Simulate upload progress
+    const progressBar = document.createElement('div');
+    progressBar.className = 'upload-progress-bar';
+    progressBar.style.width = '0%';
+    
+    // In a REAL app, you would:
+    // 1. Upload to cloud storage (Firebase, AWS S3, etc.)
+    // 2. Get a public URL
+    // 3. Send that URL via socket.io
+    
+    // For demo, we'll simulate with setTimeout
+    setTimeout(() => {
+        progressBar.style.width = '30%';
+    }, 300);
+    
+    setTimeout(() => {
+        progressBar.style.width = '70%';
+    }, 800);
+    
+    setTimeout(() => {
+        progressBar.style.width = '100%';
+        
+        // Send image via socket (as base64 for demo)
+        // In production, send URL only
+        socket.emit('send-image', {
+            imageData: imageUrl,
+            filename: file.name,
+            size: file.size
+        });
+        
+        // Update message status
+        updateLastMessageStatus('Sent');
+        
+        // Remove progress bar after 2 seconds
+        setTimeout(() => {
+            progressBar.remove();
+        }, 2000);
+        
+    }, 1500);
+}
+
+function addImageMessage(imageSrc, caption = '', username = '') {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${username === 'You' || username === myUsername ? 'sent' : 'received'}`;
+    
+    messageDiv.innerHTML = `
+        <div class="message-username">${username}</div>
+        <div class="image-message">
+            <img src="${imageSrc}" alt="${caption}" loading="lazy">
+            ${caption ? `<div class="image-caption">${caption}</div>` : ''}
+        </div>
+        <div class="message-time">${time}</div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    scrollToBottom();
+    
+    // Add progress bar for sent images
+    if (username === 'You' || username === myUsername) {
+        const progressDiv = document.createElement('div');
+        progressDiv.className = 'upload-progress';
+        progressDiv.innerHTML = '<div class="upload-progress-bar"></div>';
+        messageDiv.appendChild(progressDiv);
+    }
+}
+
+function updateLastMessageStatus(status) {
+    const lastMessage = messagesContainer.lastElementChild;
+    if (lastMessage && lastMessage.querySelector('.message-time')) {
+        const timeElement = lastMessage.querySelector('.message-time');
+        timeElement.textContent = `${status} • ${timeElement.textContent.split('•')[1] || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+}
+
+// Handle incoming images from server
+socket.on('receive-image', (data) => {
+    if (data.user !== myUsername) {
+        addImageMessage(data.imageData, `Image from ${data.user}`, data.user);
+        vibrate('message');
+        playNotificationSound('message');
+    }
+});    addSystemMessage(`🎉 ${username} joined the chat`);
         playNotificationSound('join');
     }
 });
@@ -247,7 +386,76 @@ function playNotificationSound(type) {
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
     } catch (e) {
-        // Audio not supported - silently fail
+     // ========== OFFLINE MODE HANDLING ==========
+
+// Check online status
+window.addEventListener('online', () => {
+    addSystemMessage("✅ Back online! Reconnecting...");
+    socket.connect();
+    // Try to rejoin if needed
+    if (myUsername) {
+        setTimeout(() => {
+            socket.emit('join-chat', myUsername);
+        }, 1000);
+    }
+});
+
+window.addEventListener('offline', () => {
+    addSystemMessage("⚠️ You're offline. Messages will send when back online.");
+});
+
+// Store unsent messages when offline
+let offlineMessages = [];
+
+// Modify sendMessage function to handle offline
+function sendMessage() {
+    const message = messageInput.value.trim();
+    
+    if (message && myUsername) {
+        if (navigator.onLine) {
+            // Online - send immediately
+            socket.emit('send-message', message);
+            addMessage('sent', message, 'You');
+        } else {
+            // Offline - store for later
+            offlineMessages.push(message);
+            addMessage('sent', message, 'You (offline)');
+            addSystemMessage("Message saved. Will send when back online.");
+            
+            // Save to localStorage
+            localStorage.setItem('offline_messages', JSON.stringify(offlineMessages));
+        }
+        
+        // Clear input
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        socket.emit('stop-typing');
+        scrollToBottom();
+    }
+}
+
+// Send stored messages when back online
+function sendOfflineMessages() {
+    if (offlineMessages.length > 0 && myUsername && navigator.onLine) {
+        offlineMessages.forEach(msg => {
+            socket.emit('send-message', msg);
+        });
+        offlineMessages = [];
+        localStorage.removeItem('offline_messages');
+        addSystemMessage("All offline messages sent!");
+    }
+}
+
+// Load offline messages on startup
+document.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('offline_messages');
+    if (saved) {
+        offlineMessages = JSON.parse(saved);
+        if (offlineMessages.length > 0) {
+            addSystemMessage(`You have ${offlineMessages.length} unsent messages.`);
+        }
+    }
+});   // Audio not supported - silently fail
     }
 }
 
@@ -278,7 +486,76 @@ document.addEventListener('touchend', function(event) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if user was already in chat (for page refresh)
+   // ========== VIBRATION FEEDBACK ==========
+function vibrate(pattern = 50) {
+    // Check if vibration is supported
+    if ("vibrate" in navigator) {
+        // Different patterns for different events
+        let vibrationPattern = pattern;
+        
+        // If pattern is a string, use predefined patterns
+        if (typeof pattern === 'string') {
+            switch(pattern) {
+                case 'message':
+                    vibrationPattern = [100, 50, 100]; // Two short vibrations
+                    break;
+                case 'send':
+                    vibrationPattern = 30; // Very short
+                    break;
+                case 'error':
+                    vibrationPattern = [200, 100, 200]; // Long vibration pattern
+                    break;
+                case 'join':
+                    vibrationPattern = [100, 50, 100, 50, 100]; // Happy pattern
+                    break;
+                default:
+                    vibrationPattern = 50;
+            }
+        }
+        
+        try {
+            navigator.vibrate(vibrationPattern);
+        } catch (e) {
+            // Silent fail if vibration fails
+        }
+    }
+}
+
+// Add vibration to these events:
+function joinChat() {
+    const username = usernameInput.value.trim();
+    
+    if (username) {
+        myUsername = username;
+        socket.emit('join-chat', username);
+        
+        // Vibration feedback
+        vibrate('join');
+        
+        // ... rest of your existing code ...
+    }
+}
+
+// Modify sendMessage to add vibration
+function sendMessage() {
+    const message = messageInput.value.trim();
+    
+    if (message && myUsername) {
+        // Vibration on send
+        vibrate('send');
+        
+        // ... rest of your existing code ...
+    }
+}
+
+// Add vibration to incoming messages
+socket.on('receive-message', (data) => {
+    if (data.user !== myUsername) {
+        addMessage('received', data.text, data.user);
+        vibrate('message'); // Vibrate on new message
+        playNotificationSound('message');
+    }
+}); // Check if user was already in chat (for page refresh)
     const savedUsername = localStorage.getItem('chat-username');
     if (savedUsername) {
         usernameInput.value = savedUsername;

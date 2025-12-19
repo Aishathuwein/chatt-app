@@ -77,7 +77,18 @@
             </button>
         </div>
     </div>
+<!-- IMAGE SHARING -->
+<div class="media-buttons">
+    <button id="image-btn" class="media-btn" title="Share image">
+        <i class="fas fa-image"></i>
+    </button>
+    <button id="camera-btn" class="media-btn" title="Take photo">
+        <i class="fas fa-camera"></i>
+    </button>
+</div>
 
+<input type="file" id="image-input" accept="image/*" capture="environment" hidden>
+<input type="file" id="camera-input" accept="image/*" capture="user" hidden>
     <!-- SIDEBAR OVERLAY -->
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
