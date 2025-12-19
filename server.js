@@ -1,27 +1,20 @@
-// ========== 1. TOP OF FILE ==========
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const path = require('path');  // ⭐ ADD THIS LINE
+const path = require('path');
 
-// Create app
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// ========== 2. MIDDLE SECTION ==========
-// ⭐ ADD THESE TWO LINES HERE:
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Store online users
 let onlineUsers = {};
 
-// ========== 3. SOCKET.IO CODE ==========
-// (Your existing socket.io code stays here - don't change it)
 io.on('connection', (socket) => {
     console.log('New connection:', socket.id);
 
@@ -33,11 +26,57 @@ io.on('connection', (socket) => {
 
     socket.on('send-message', (message) => {
         const username = onlineUsers[socket.id];
-        socket.broadcast.emit('receive-message', {
-            user: username,
-            text: message,
-            time: new Date().toLocaleTimeString()
-        });
+        if (username) {
+            socket.broadcast.emit('receive-message', {
+                user: username,
+                text: message,
+                time: new Date().toLocaleTimeString()
+            });
+        }
+    });
+
+    socket.on('send-image', (imageData) => {
+        const username = onlineUsers[socket.id];
+        if (username) {
+            console.log(`${username} sent an image`);
+            
+            const imageResponse = {
+                user: username,
+                imageUrl: imageData.imageUrl,
+                imageId: imageData.imageId || Date.now(),
+                caption: imageData.caption || '',
+                time: new Date().toLocaleTimeString()
+            };
+            
+            socket.broadcast.emit('receive-image', imageResponse);
+            
+            socket.emit('image-sent-confirm', {
+                ...imageResponse,
+                status: 'sent'
+            });
+        }
+    });
+
+    socket.on('send-audio', (audioData) => {
+        const username = onlineUsers[socket.id];
+        if (username) {
+            console.log(`${username} sent audio`);
+            
+            const audioResponse = {
+                user: username,
+                audioUrl: audioData.audioUrl,
+                audioId: audioData.audioId || Date.now(),
+                duration: audioData.duration || 0,
+                time: new Date().toLocaleTimeString()
+            };
+            
+            socket.broadcast.emit('receive-audio', audioResponse);
+            
+            socket.emit('audio-sent-confirm', {
+                ...audioResponse,
+                status: 'sent'
+            });
+        }
     });
 
     socket.on('typing', (username) => {
@@ -58,11 +97,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// ========== 4. BOTTOM OF FILE ==========
-// ⭐ CHANGE THESE LINES AT THE BOTTOM:
-const PORT = process.env.PORT || 3000;  // ⭐ USE THIS LINE
-
-server.listen(PORT, '0.0.0.0', () => {  // ⭐ ADD '0.0.0.0'
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Server running on port ${PORT}`);
-    console.log(`🌐 Ready for global access!`);
 });

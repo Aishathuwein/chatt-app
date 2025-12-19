@@ -1,10 +1,12 @@
-// ========== INITIALIZATION ==========
 const socket = io();
 let myUsername = '';
 let onlineUsers = [];
 let typingTimeout;
+let mediaRecorder = null;
+let audioChunks = [];
+let audioRecordingTimer = null;
+let recordingSeconds = 0;
 
-// DOM Elements
 const loginScreen = document.getElementById('login-screen');
 const chatScreen = document.getElementById('chat-screen');
 const usernameInput = document.getElementById('username-input');
@@ -13,7 +15,6 @@ const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const messagesContainer = document.getElementById('messages-container');
 const onlineCount = document.getElementById('online-count');
-const sidebarOnlineCount = document.getElementById('sidebar-online-count');
 const typingIndicator = document.getElementById('typing-indicator');
 const typingUser = document.getElementById('typing-user');
 const usersList = document.getElementById('users-list');
@@ -21,10 +22,46 @@ const menuBtn = document.getElementById('menu-btn');
 const sidebar = document.getElementById('sidebar');
 const sidebarOverlay = document.getElementById('sidebar-overlay');
 const closeSidebar = document.getElementById('close-sidebar');
-const backBtn = document.getElementById('back-btn');
-const chatTitleText = document.getElementById('chat-title-text');
 
-// ========== MOBILE UI FUNCTIONS ==========
+const audioBtn = document.getElementById('audio-btn');
+const stopAudioBtn = document.getElementById('stop-audio-btn');
+const audioRecording = document.getElementById('audio-recording');
+const recordingTime = document.getElementById('recording-time');
+const cancelAudioBtn = document.getElementById('cancel-audio');
+const cameraBtn = document.getElementById('camera-btn');
+const galleryBtn = document.getElementById('gallery-btn');
+const imageInput = document.getElementById('image-input');
+
+joinBtn.addEventListener('click', joinChat);
+usernameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') joinChat();
+});
+
+sendBtn.addEventListener('click', sendMessage);
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+    
+    if (myUsername && this.value.trim().length > 0) {
+        socket.emit('typing', myUsername);
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            socket.emit('stop-typing');
+        }, 1000);
+    }
+});
+
+menuBtn.addEventListener('click', toggleSidebar);
+sidebarOverlay.addEventListener('click', closeSidebarMenu);
+closeSidebar.addEventListener('click', closeSidebarMenu);
+
 function toggleSidebar() {
     sidebar.classList.toggle('sidebar-open');
     sidebarOverlay.classList.toggle('showing');
@@ -35,59 +72,6 @@ function closeSidebarMenu() {
     sidebarOverlay.classList.remove('showing');
 }
 
-// Auto-resize textarea
-messageInput.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = (this.scrollHeight) + 'px';
-    
-    // Show typing indicator
-    if (myUsername && this.value.trim().length > 0) {
-        socket.emit('typing', myUsername);
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-            socket.emit('stop-typing');
-        }, 1000);
-    }
-});
-
-// ========== EVENT LISTENERS ==========
-// Join chat
-joinBtn.addEventListener('click', joinChat);
-usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') joinChat();
-});
-
-// Send message
-sendBtn.addEventListener('click', sendMessage);
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
-
-// Mobile sidebar controls
-menuBtn.addEventListener('click', toggleSidebar);
-sidebarOverlay.addEventListener('click', closeSidebarMenu);
-closeSidebar.addEventListener('click', closeSidebarMenu);
-backBtn.addEventListener('click', () => {
-    if (window.innerWidth < 1024) {
-        // Show confirmation for mobile
-        if (confirm('Leave chat?')) {
-            socket.disconnect();
-            chatScreen.classList.add('hidden');
-            loginScreen.classList.remove('hidden');
-        }
-    }
-});
-
-// Handle virtual keyboard on mobile
-window.addEventListener('resize', () => {
-    // Scroll to bottom when keyboard appears/disappears
-    setTimeout(scrollToBottom, 300);
-});
-
-// ========== CHAT FUNCTIONS ==========
 function joinChat() {
     const username = usernameInput.value.trim();
     
@@ -95,30 +79,15 @@ function joinChat() {
         myUsername = username;
         socket.emit('join-chat', username);
         
-        // Switch screens
         loginScreen.classList.add('hidden');
         chatScreen.classList.remove('hidden');
         
-        // Update title
-        chatTitleText.textContent = `Hi, ${username}!`;
-        
-        // Focus on message input
         setTimeout(() => {
             messageInput.focus();
             scrollToBottom();
         }, 300);
         
-        // Add welcome message
         addSystemMessage(`Welcome to the chat, ${username}! 👋`);
-        
-        // Prevent accidental back navigation on mobile
-        if ('standalone' in navigator || window.matchMedia('(display-mode: standalone)').matches) {
-            // PWA mode
-            history.pushState(null, null, location.href);
-            window.onpopstate = function() {
-                history.pushState(null, null, location.href);
-            };
-        }
     }
 }
 
@@ -126,168 +95,18 @@ function sendMessage() {
     const message = messageInput.value.trim();
     
     if (message && myUsername) {
-        // Send to server
         socket.emit('send-message', message);
-        
-        // Add to UI immediately
         addMessage('sent', message, 'You');
-        
-        // Clear input
         messageInput.value = '';
         messageInput.style.height = 'auto';
-        
-        // Stop typing indicator
         socket.emit('stop-typing');
-        
-        // Scroll to bottom
         scrollToBottom();
     }
 }
 
-// ========== SOCKET.IO EVENT HANDLERS ==========
 socket.on('user-joined', (username) => {
     if (username !== myUsername) {
-    // ========== IMAGE SHARING ==========
-const imageBtn = document.getElementById('image-btn');
-const cameraBtn = document.getElementById('camera-btn');
-const imageInput = document.getElementById('image-input');
-const cameraInput = document.getElementById('camera-input');
-
-// Image button click
-imageBtn.addEventListener('click', () => {
-    imageInput.click();
-});
-
-// Camera button click
-cameraBtn.addEventListener('click', () => {
-    cameraInput.click();
-});
-
-// Handle image selection
-imageInput.addEventListener('change', handleImageSelect);
-cameraInput.addEventListener('change', handleImageSelect);
-
-async function handleImageSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        alert('Image too large! Max 5MB.');
-        return;
-    }
-    
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
-        return;
-    }
-    
-    // Vibration feedback
-    vibrate('send');
-    
-    // Create preview message immediately
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const imageUrl = e.target.result;
-        addImageMessage(imageUrl, 'Uploading...', 'You');
-        
-        // In a real app, you'd upload to a server here
-        // For demo, we'll simulate upload and send base64
-        simulateImageUpload(file, imageUrl);
-    };
-    reader.readAsDataURL(file);
-    
-    // Reset input
-    event.target.value = '';
-}
-
-function simulateImageUpload(file, imageUrl) {
-    // Simulate upload progress
-    const progressBar = document.createElement('div');
-    progressBar.className = 'upload-progress-bar';
-    progressBar.style.width = '0%';
-    
-    // In a REAL app, you would:
-    // 1. Upload to cloud storage (Firebase, AWS S3, etc.)
-    // 2. Get a public URL
-    // 3. Send that URL via socket.io
-    
-    // For demo, we'll simulate with setTimeout
-    setTimeout(() => {
-        progressBar.style.width = '30%';
-    }, 300);
-    
-    setTimeout(() => {
-        progressBar.style.width = '70%';
-    }, 800);
-    
-    setTimeout(() => {
-        progressBar.style.width = '100%';
-        
-        // Send image via socket (as base64 for demo)
-        // In production, send URL only
-        socket.emit('send-image', {
-            imageData: imageUrl,
-            filename: file.name,
-            size: file.size
-        });
-        
-        // Update message status
-        updateLastMessageStatus('Sent');
-        
-        // Remove progress bar after 2 seconds
-        setTimeout(() => {
-            progressBar.remove();
-        }, 2000);
-        
-    }, 1500);
-}
-
-function addImageMessage(imageSrc, caption = '', username = '') {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${username === 'You' || username === myUsername ? 'sent' : 'received'}`;
-    
-    messageDiv.innerHTML = `
-        <div class="message-username">${username}</div>
-        <div class="image-message">
-            <img src="${imageSrc}" alt="${caption}" loading="lazy">
-            ${caption ? `<div class="image-caption">${caption}</div>` : ''}
-        </div>
-        <div class="message-time">${time}</div>
-    `;
-    
-    messagesContainer.appendChild(messageDiv);
-    scrollToBottom();
-    
-    // Add progress bar for sent images
-    if (username === 'You' || username === myUsername) {
-        const progressDiv = document.createElement('div');
-        progressDiv.className = 'upload-progress';
-        progressDiv.innerHTML = '<div class="upload-progress-bar"></div>';
-        messageDiv.appendChild(progressDiv);
-    }
-}
-
-function updateLastMessageStatus(status) {
-    const lastMessage = messagesContainer.lastElementChild;
-    if (lastMessage && lastMessage.querySelector('.message-time')) {
-        const timeElement = lastMessage.querySelector('.message-time');
-        timeElement.textContent = `${status} • ${timeElement.textContent.split('•')[1] || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    }
-}
-
-// Handle incoming images from server
-socket.on('receive-image', (data) => {
-    if (data.user !== myUsername) {
-        addImageMessage(data.imageData, `Image from ${data.user}`, data.user);
-        vibrate('message');
-        playNotificationSound('message');
-    }
-});    addSystemMessage(`🎉 ${username} joined the chat`);
-        playNotificationSound('join');
+        addSystemMessage(`🎉 ${username} joined the chat`);
     }
 });
 
@@ -300,7 +119,6 @@ socket.on('user-left', (username) => {
 socket.on('receive-message', (data) => {
     if (data.user !== myUsername) {
         addMessage('received', data.text, data.user);
-        playNotificationSound('message');
     }
 });
 
@@ -320,7 +138,6 @@ socket.on('update-users', (users) => {
     updateOnlineUsers(users);
 });
 
-// ========== UI HELPER FUNCTIONS ==========
 function addMessage(type, text, username) {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
@@ -347,9 +164,7 @@ function addSystemMessage(text) {
 function updateOnlineUsers(users) {
     const count = users.length;
     onlineCount.textContent = `${count} online`;
-    sidebarOnlineCount.textContent = count;
     
-    // Update users list in sidebar
     usersList.innerHTML = '';
     users.forEach(user => {
         const userItem = document.createElement('div');
@@ -357,7 +172,7 @@ function updateOnlineUsers(users) {
         userItem.innerHTML = `
             <span class="user-dot"></span>
             <span class="user-name">${user}</span>
-            ${user === myUsername ? '<span class="user-you">(You)</span>' : ''}
+            ${user === myUsername ? '<span style="font-size:12px;color:#666;">(You)</span>' : ''}
         `;
         usersList.appendChild(userItem);
     });
@@ -367,296 +182,243 @@ function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-function playNotificationSound(type) {
-    // Simple beep sound for notifications
-    try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = type === 'message' ? 800 : 1200;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
-    } catch (e) {
-     // ========== OFFLINE MODE HANDLING ==========
+// IMAGE SHARING
+if (cameraBtn && galleryBtn) {
+    cameraBtn.addEventListener('click', () => {
+        imageInput.setAttribute('capture', 'environment');
+        imageInput.click();
+    });
 
-// Check online status
-window.addEventListener('online', () => {
-    addSystemMessage("✅ Back online! Reconnecting...");
-    socket.connect();
-    // Try to rejoin if needed
-    if (myUsername) {
-        setTimeout(() => {
-            socket.emit('join-chat', myUsername);
-        }, 1000);
-    }
-});
-
-window.addEventListener('offline', () => {
-    addSystemMessage("⚠️ You're offline. Messages will send when back online.");
-});
-
-// Store unsent messages when offline
-let offlineMessages = [];
-
-// Modify sendMessage function to handle offline
-function sendMessage() {
-    const message = messageInput.value.trim();
-    
-    if (message && myUsername) {
-        if (navigator.onLine) {
-            // Online - send immediately
-            socket.emit('send-message', message);
-            addMessage('sent', message, 'You');
-        } else {
-            // Offline - store for later
-            offlineMessages.push(message);
-            addMessage('sent', message, 'You (offline)');
-            addSystemMessage("Message saved. Will send when back online.");
-            
-            // Save to localStorage
-            localStorage.setItem('offline_messages', JSON.stringify(offlineMessages));
-        }
-        
-        // Clear input
-        messageInput.value = '';
-        messageInput.style.height = 'auto';
-        socket.emit('stop-typing');
-        scrollToBottom();
-    }
+    galleryBtn.addEventListener('click', () => {
+        imageInput.removeAttribute('capture');
+        imageInput.click();
+    });
 }
 
-// Send stored messages when back online
-function sendOfflineMessages() {
-    if (offlineMessages.length > 0 && myUsername && navigator.onLine) {
-        offlineMessages.forEach(msg => {
-            socket.emit('send-message', msg);
-        });
-        offlineMessages = [];
-        localStorage.removeItem('offline_messages');
-        addSystemMessage("All offline messages sent!");
-    }
-}
+imageInput.addEventListener('change', handleImageSelect);
 
-// Load offline messages on startup
-document.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('offline_messages');
-    if (saved) {
-        offlineMessages = JSON.parse(saved);
-        if (offlineMessages.length > 0) {
-            addSystemMessage(`You have ${offlineMessages.length} unsent messages.`);
-        }
-    }
-});   // Audio not supported - silently fail
-    }
-}
+let lastImageId = null;
 
-// ========== MOBILE-SPECIFIC FEATURES ==========
-// Handle touch events for better mobile UX
-messagesContainer.addEventListener('touchstart', () => {
-    // Hide keyboard if user touches message area
-    if (document.activeElement === messageInput) {
-        messageInput.blur();
-    }
-});
-
-// Handle app-like behavior
-if (window.matchMedia('(display-mode: standalone)').matches) {
-    // Running as PWA
-    document.body.classList.add('pwa-mode');
-}
-
-// Prevent zoom on double-tap (mobile)
-let lastTouchEnd = 0;
-document.addEventListener('touchend', function(event) {
-    const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) {
-        event.preventDefault();
-    }
-    lastTouchEnd = now;
-}, false);
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-   // ========== VIBRATION FEEDBACK ==========
-function vibrate(pattern = 50) {
-    // Check if vibration is supported
-    if ("vibrate" in navigator) {
-        // Different patterns for different events
-        let vibrationPattern = pattern;
-        
-        // If pattern is a string, use predefined patterns
-        if (typeof pattern === 'string') {
-            switch(pattern) {
-                case 'message':
-                    vibrationPattern = [100, 50, 100]; // Two short vibrations
-                    break;
-                case 'send':
-                    vibrationPattern = 30; // Very short
-                    break;
-                case 'error':
-                    vibrationPattern = [200, 100, 200]; // Long vibration pattern
-                    break;
-                case 'join':
-                    vibrationPattern = [100, 50, 100, 50, 100]; // Happy pattern
-                    break;
-                default:
-                    vibrationPattern = 50;
-            }
-        }
-        
-        try {
-            navigator.vibrate(vibrationPattern);
-        } catch (e) {
-            // Silent fail if vibration fails
-        }
-    }
-}
-
-// Add vibration to these events:
-function joinChat() {
-    const username = usernameInput.value.trim();
-    
-    if (username) {
-        myUsername = username;
-        socket.emit('join-chat', username);
-        
-        // Vibration feedback
-        vibrate('join');
-        
-        // ... rest of your existing code ...
-    }
-}
-// ===== IMAGE SHARING =====
-const cameraBtn = document.getElementById('camera-btn');
-const galleryBtn = document.getElementById('gallery-btn');
-const imageInput = document.getElementById('image-input');
-
-// Open camera
-cameraBtn.addEventListener('click', () => {
-    imageInput.setAttribute('capture', 'environment');
-    imageInput.click();
-});
-
-// Open gallery
-galleryBtn.addEventListener('click', () => {
-    imageInput.removeAttribute('capture');
-    imageInput.click();
-});
-
-// Handle image selection
-imageInput.addEventListener('change', function(e) {
-    const file = e.target.files[0];
+function handleImageSelect(event) {
+    const file = event.target.files[0];
     if (!file) return;
     
-    // Check if it's an image
     if (!file.type.startsWith('image/')) {
-        alert('Please select an image file (JPG, PNG, GIF)');
+        alert('Please select an image file');
         return;
     }
     
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        alert('Image is too large! Maximum size is 5MB.');
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Image too large! Max 2MB.');
         return;
     }
     
-    // Preview and send
-    previewAndSendImage(file);
-});
-
-function previewAndSendImage(file) {
+    lastImageId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    
     const reader = new FileReader();
-    
-    reader.onload = function(event) {
-        const imageData = event.target.result;
+    reader.onload = function(e) {
+        const base64Image = e.target.result;
         
-        // Create image message in chat
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message sent';
-        messageDiv.innerHTML = `
-            <div class="message-username">You</div>
-            <div class="image-container">
-                <img src="${imageData}" alt="Shared image">
-            </div>
-            <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} • Sending...</div>
-        `;
+        showImageMessage(base64Image, myUsername, 'You', 'Sending...', lastImageId);
         
-        messagesContainer.appendChild(messageDiv);
-        scrollToBottom();
-        
-        // Send to server (simulated for now)
-        setTimeout(() => {
-            // In real app: socket.emit('send-image', imageData)
-            messageDiv.querySelector('.message-time').textContent = 
-                `${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} • Sent`;
-            
-            // Simulate others seeing it
-            setTimeout(() => {
-                addImageMessage(imageData, 'Alice', 'Nice picture!');
-            }, 1000);
-        }, 1500);
+        socket.emit('send-image', {
+            imageUrl: base64Image,
+            imageId: lastImageId,
+            filename: file.name
+        });
     };
     
     reader.readAsDataURL(file);
-    imageInput.value = ''; // Reset input
+    imageInput.value = '';
 }
 
-// Function to display received images
-function addImageMessage(imageSrc, username, caption = '') {
+socket.on('receive-image', (data) => {
+    if (data.user !== myUsername) {
+        showImageMessage(data.imageUrl, data.user, data.user, '', data.imageId);
+    }
+});
+
+socket.on('image-sent-confirm', (data) => {
+    if (data.imageId === lastImageId) {
+        updateImageStatus(data.imageId, 'Sent');
+        lastImageId = null;
+    }
+});
+
+function showImageMessage(imageUrl, senderUsername, displayName, status, imageId) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'message received';
+    messageDiv.className = `message ${senderUsername === myUsername ? 'sent' : 'received'}`;
+    messageDiv.dataset.imageId = imageId;
+    
     messageDiv.innerHTML = `
-        <div class="message-username">${username}</div>
+        <div class="message-username">${displayName}</div>
         <div class="image-container">
-            <img src="${imageSrc}" alt="${caption}">
-            ${caption ? `<div style="padding: 8px; background: rgba(0,0,0,0.7); color: white; font-size: 14px;">${caption}</div>` : ''}
+            <img src="${imageUrl}" alt="Shared image">
         </div>
-        <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</div>
+        <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} • ${status}</div>
     `;
     
     messagesContainer.appendChild(messageDiv);
     scrollToBottom();
 }
-// Modify sendMessage to add vibration
-function sendMessage() {
-    const message = messageInput.value.trim();
-    
-    if (message && myUsername) {
-        // Vibration on send
-        vibrate('send');
-        
-        // ... rest of your existing code ...
+
+function updateImageStatus(imageId, newStatus) {
+    const message = document.querySelector(`[data-image-id="${imageId}"]`);
+    if (message) {
+        const timeElement = message.querySelector('.message-time');
+        if (timeElement) {
+            const currentTime = timeElement.textContent.split('•')[0].trim();
+            timeElement.textContent = `${currentTime} • ${newStatus}`;
+        }
     }
 }
 
-// Add vibration to incoming messages
-socket.on('receive-message', (data) => {
-    if (data.user !== myUsername) {
-        addMessage('received', data.text, data.user);
-        vibrate('message'); // Vibrate on new message
-        playNotificationSound('message');
+// AUDIO RECORDING
+if (audioBtn && stopAudioBtn && cancelAudioBtn) {
+    audioBtn.addEventListener('click', startAudioRecording);
+    stopAudioBtn.addEventListener('click', stopAudioRecording);
+    cancelAudioBtn.addEventListener('click', cancelAudioRecording);
+}
+
+async function startAudioRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            sendAudioMessage(audioBlob);
+            
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start();
+        
+        audioBtn.classList.add('hidden');
+        stopAudioBtn.classList.remove('hidden');
+        audioRecording.classList.remove('hidden');
+        
+        recordingSeconds = 0;
+        updateRecordingTime();
+        audioRecordingTimer = setInterval(updateRecordingTime, 1000);
+        
+    } catch (err) {
+        console.error('Error accessing microphone:', err);
+        alert('Cannot access microphone. Please check permissions.');
     }
-}); // Check if user was already in chat (for page refresh)
-    const savedUsername = localStorage.getItem('chat-username');
-    if (savedUsername) {
-        usernameInput.value = savedUsername;
-        usernameInput.focus();
+}
+
+function updateRecordingTime() {
+    recordingSeconds++;
+    const minutes = Math.floor(recordingSeconds / 60);
+    const seconds = recordingSeconds % 60;
+    recordingTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function stopAudioRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        resetAudioUI();
     }
+}
+
+function cancelAudioRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    resetAudioUI();
+}
+
+function resetAudioUI() {
+    audioBtn.classList.remove('hidden');
+    stopAudioBtn.classList.add('hidden');
+    audioRecording.classList.add('hidden');
     
-    // Auto-join on Enter key
-    usernameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            joinChat();
-            localStorage.setItem('chat-username', usernameInput.value);
-        }
-    });
+    if (audioRecordingTimer) {
+        clearInterval(audioRecordingTimer);
+        audioRecordingTimer = null;
+    }
+}
+
+let lastAudioId = null;
+
+function sendAudioMessage(audioBlob) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Audio = e.target.result;
+        lastAudioId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        
+        showAudioMessage(base64Audio, myUsername, 'You', 'Sending...', lastAudioId, recordingSeconds);
+        
+        socket.emit('send-audio', {
+            audioUrl: base64Audio,
+            audioId: lastAudioId,
+            duration: recordingSeconds
+        });
+        
+        recordingSeconds = 0;
+    };
+    reader.readAsDataURL(audioBlob);
+}
+
+socket.on('receive-audio', (data) => {
+    if (data.user !== myUsername) {
+        showAudioMessage(data.audioUrl, data.user, data.user, '', data.audioId, data.duration);
+    }
 });
+
+socket.on('audio-sent-confirm', (data) => {
+    if (data.audioId === lastAudioId) {
+        updateAudioStatus(data.audioId, 'Sent');
+        lastAudioId = null;
+    }
+});
+
+function showAudioMessage(audioUrl, senderUsername, displayName, status, audioId, duration) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${senderUsername === myUsername ? 'sent' : 'received'}`;
+    messageDiv.dataset.audioId = audioId;
+    
+    const durationText = formatDuration(duration);
+    
+    messageDiv.innerHTML = `
+        <div class="message-username">${displayName}</div>
+        <div class="audio-message">
+            <button class="audio-play-btn" onclick="playAudio('${audioUrl}')">
+                <i class="fas fa-play"></i>
+            </button>
+            <div class="audio-duration">${durationText}</div>
+        </div>
+        <div class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} • ${status}</div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+function formatDuration(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function updateAudioStatus(audioId, newStatus) {
+    const message = document.querySelector(`[data-audio-id="${audioId}"]`);
+    if (message) {
+        const timeElement = message.querySelector('.message-time');
+        if (timeElement) {
+            const currentTime = timeElement.textContent.split('•')[0].trim();
+            timeElement.textContent = `${currentTime} • ${newStatus}`;
+        }
+    }
+}
+
+function playAudio(audioUrl) {
+    const audio = new Audio(audioUrl);
+    audio.play();
+}
