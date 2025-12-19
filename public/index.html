@@ -1,46 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Simple Chat App</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Chat App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
-    <div class="container">
-        <!-- Login Screen -->
-        <div id="login-screen" class="screen">
-            <div class="login-box">
-                <h1>💬 Welcome to Chat!</h1>
-                <p>Enter your name to start chatting</p>
-                <input type="text" id="username" placeholder="Your name" maxlength="20">
-                <button id="join-btn">Join Chat</button>
-                <p class="hint">Hint: Open another browser tab to chat with yourself!</p>
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
+        <div class="login-container">
+            <div class="login-icon">
+                <i class="fas fa-comments" style="font-size: 48px; color: #007AFF; margin-bottom: 20px;"></i>
+            </div>
+            <h1 class="login-title">Mobile Chat</h1>
+            <p class="login-subtitle">Join the conversation</p>
+            
+            <input type="text" id="username-input" placeholder="Enter your name" maxlength="20" autocomplete="off">
+            <button id="join-btn">
+                <i class="fas fa-sign-in-alt" style="margin-right: 8px;"></i>
+                Join Chat
+            </button>
+            
+            <p class="login-hint">Works on phones, tablets, and computers</p>
+        </div>
+    </div>
+
+    <!-- CHAT SCREEN -->
+    <div id="chat-screen" class="hidden">
+        <!-- CHAT HEADER -->
+        <div class="chat-header">
+            <button class="back-btn" id="back-btn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            
+            <div class="chat-title">
+                <span id="chat-title-text">Group Chat</span>
+                <div class="online-indicator">
+                    <span class="online-dot"></span>
+                    <span id="online-count">0 online</span>
+                </div>
+            </div>
+            
+            <button class="menu-btn" id="menu-btn">
+                <i class="fas fa-users"></i>
+            </button>
+        </div>
+
+        <!-- MESSAGES CONTAINER -->
+        <div class="messages-container" id="messages-container">
+            <!-- Messages will appear here -->
+        </div>
+
+        <!-- TYPING INDICATOR -->
+        <div class="typing-container">
+            <div class="typing-indicator hidden" id="typing-indicator">
+                <span id="typing-user">Someone</span> is typing
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
             </div>
         </div>
 
-        <!-- Chat Screen (hidden until login) -->
-        <div id="chat-screen" class="screen hidden">
-            <div class="sidebar">
-                <h2>👥 Online</h2>
-                <div id="online-count">0 users</div>
-                <div id="users-list"></div>
-            </div>
-            
-            <div class="main">
-                <div class="header">
-                    <h2>Group Chat</h2>
-                    <div id="typing-indicator"></div>
-                </div>
-                
-                <div class="messages" id="messages">
-                    <!-- Messages appear here -->
-                </div>
-                
-                <div class="input-area">
-                    <input type="text" id="message-input" placeholder="Type your message...">
-                    <button id="send-btn">Send</button>
-                </div>
-            </div>
+        <!-- MESSAGE INPUT -->
+        <div class="input-container">
+            <textarea id="message-input" placeholder="Type a message..." rows="1"></textarea>
+            <button id="send-btn">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- SIDEBAR OVERLAY -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- ONLINE USERS SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2 class="sidebar-title">Online Users</h2>
+            <button class="close-sidebar" id="close-sidebar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="online-count">
+            <span id="sidebar-online-count">0</span> users online
+        </div>
+        
+        <div class="users-list" id="users-list">
+            <!-- Online users will appear here -->
         </div>
     </div>
 
